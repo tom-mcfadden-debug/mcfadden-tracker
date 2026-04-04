@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>McFadden Tracker</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #0f1117; color: #f0f2ff; min-height: 100vh; }
+.screen { display: none; min-height: 100vh; flex-direction: column; }
+.screen.active { display: flex; }
+
+.header { padding: 20px 20px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2e3350; background: #1a1d27; position: sticky; top: 0; z-index: 10; flex-shrink: 0; }
+.back-btn { width: 44px; height: 44px; background: #22263a; border: 1px solid #2e3350; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 22px; flex-shrink: 0; color: #f0f2ff; }
+.header-title { font-size: 20px; font-weight: 700; color: #f0f2ff; }
+.header-sub { font-size: 13px; color: #7b82a8; margin-top: 2px; }
+
+.nav-tabs { display: flex; background: #1a1d27; border-bottom: 1px solid #2e3350; flex-shrink: 0; }
+.nav-tab { flex: 1; padding: 14px; text-align: center; font-size: 15px; font-weight: 600; color: #7b82a8; cursor: pointer; border-bottom: 3px solid transparent; }
+.nav-tab.active { color: #6c7fff; border-bottom-color: #6c7fff; }
+
+.scroll-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* PERIODS */
+.periods-hero { padding: 28px 20px 16px; text-align: center; }
+.app-title { font-size: 28px; font-weight: 700; color: #6c7fff; }
+.app-date { font-size: 14px; color: #7b82a8; margin-top: 6px; }
+.period-grid { padding: 8px 16px 32px; display: flex; flex-direction: column; gap: 12px; }
+.period-card { background: #1a1d27; border: 1px solid #2e3350; border-left: 4px solid #6c7fff; border-radius: 16px; padding: 20px 18px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+.period-card.prep { border-left-color: #2e3350; opacity: 0.5; }
+.period-name { font-size: 20px; font-weight: 700; color: #f0f2ff; }
+.period-time { font-size: 14px; color: #7b82a8; margin-top: 4px; }
+.period-right { display: flex; align-items: center; gap: 10px; }
+.period-count { font-size: 13px; color: #7b82a8; background: #22263a; padding: 5px 11px; border-radius: 20px; }
+.period-badge { background: #ff6b6b; color: white; width: 24px; height: 24px; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.chevron { color: #7b82a8; font-size: 22px; }
+
+/* STATS */
+.stats-strip { display: flex; gap: 10px; padding: 14px 16px 4px; flex-shrink: 0; }
+.stat-pill { flex: 1; background: #1a1d27; border: 1px solid #2e3350; border-radius: 12px; padding: 12px; text-align: center; }
+.stat-num { font-size: 24px; font-weight: 700; }
+.stat-num.cell { color: #f5a623; }
+.stat-num.tardy { color: #4fc3f7; }
+.stat-num.part { color: #81c995; }
+.stat-num.bath { color: #c084fc; }
+.stat-lbl { font-size: 11px; color: #7b82a8; margin-top: 2px; }
+
+/* BATHROOM OUT BANNER */
+.out-banner { background: rgba(192,132,252,0.12); border-bottom: 1px solid rgba(192,132,252,0.3); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.out-banner-left { display: flex; align-items: center; gap: 10px; }
+.out-dot { width: 10px; height: 10px; border-radius: 50%; background: #c084fc; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+.out-name { font-size: 15px; font-weight: 600; color: #f0f2ff; }
+.out-timer { font-size: 13px; color: #c084fc; font-family: monospace; margin-top: 1px; }
+.out-stop-btn { background: #c084fc; border: none; border-radius: 10px; padding: 10px 16px; color: #1a0030; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-appearance: none; }
+
+/* ROSTER */
+.roster-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 16px 32px; }
+.search-bar { background: #1a1d27; border: 1px solid #2e3350; border-radius: 12px; padding: 14px 16px; color: #f0f2ff; font-size: 16px; font-family: inherit; width: 100%; outline: none; margin-bottom: 14px; -webkit-appearance: none; appearance: none; }
+.search-bar::placeholder { color: #7b82a8; }
+.student-list { display: flex; flex-direction: column; gap: 10px; }
+.student-card { background: #1a1d27; border: 1px solid #2e3350; border-radius: 14px; padding: 18px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.student-card.out { border-color: rgba(192,132,252,0.5); background: rgba(192,132,252,0.07); }
+.student-name { font-size: 18px; font-weight: 600; color: #f0f2ff; }
+.student-badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.badge-cell { background: rgba(245,166,35,0.15); color: #f5a623; }
+.badge-tardy { background: rgba(79,195,247,0.15); color: #4fc3f7; }
+.badge-part { background: rgba(129,201,149,0.15); color: #81c995; }
+.badge-bath { background: rgba(192,132,252,0.15); color: #c084fc; }
+.badge-owed { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+.no-issues { font-size: 13px; color: #7b82a8; }
+
+/* STUDENT SCREEN */
+.student-hero { padding: 22px 20px; text-align: center; border-bottom: 1px solid #2e3350; background: #1a1d27; flex-shrink: 0; }
+.student-hero-name { font-size: 30px; font-weight: 700; color: #f0f2ff; }
+.student-hero-period { font-size: 14px; color: #7b82a8; margin-top: 4px; }
+.action-grid { padding: 18px 16px; display: flex; flex-direction: column; gap: 12px; }
+.action-card { border-radius: 16px; padding: 22px 18px; cursor: pointer; display: flex; align-items: center; gap: 16px; }
+.action-card.cell { background: #2d1f00; border: 1px solid rgba(245,166,35,0.35); }
+.action-card.tardy { background: #001f2d; border: 1px solid rgba(79,195,247,0.35); }
+.action-card.part { background: #001a08; border: 1px solid rgba(129,201,149,0.35); }
+.action-card.bath { background: #1a0030; border: 1px solid rgba(192,132,252,0.35); }
+.action-card.bath.active-out { border-color: #c084fc; background: #2a0050; }
+.action-icon { font-size: 36px; flex-shrink: 0; }
+.action-label { font-size: 22px; font-weight: 700; }
+.action-card.cell .action-label { color: #f5a623; }
+.action-card.tardy .action-label { color: #4fc3f7; }
+.action-card.part .action-label { color: #81c995; }
+.action-card.bath .action-label { color: #c084fc; }
+.action-count { font-size: 14px; color: #7b82a8; margin-top: 4px; }
+.action-arrow { margin-left: auto; color: rgba(255,255,255,0.25); font-size: 26px; }
+
+/* BATHROOM CARD SPECIAL */
+.bath-btn { background: #c084fc; border: none; border-radius: 10px; padding: 12px 20px; color: #1a0030; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-appearance: none; margin-left: auto; }
+.bath-btn.stop { background: #ff6b6b; color: white; }
+.bath-timer-display { font-size: 20px; font-weight: 700; color: #c084fc; font-family: monospace; margin-left: auto; }
+
+/* FULLSCREEN BATHROOM OVERLAY */
+.bath-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0a001a; z-index: 300; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; }
+.bath-overlay.open { display: flex; }
+.bath-overlay-label { font-size: 16px; font-weight: 600; color: #c084fc; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; }
+.bath-overlay-name { font-size: 42px; font-weight: 700; color: #f0f2ff; margin-bottom: 8px; text-align: center; }
+.bath-overlay-period { font-size: 16px; color: #7b82a8; margin-bottom: 60px; }
+.bath-overlay-clock { font-size: 88px; font-weight: 700; color: #c084fc; font-family: monospace; letter-spacing: -2px; margin-bottom: 24px; }
+.bath-overlay-trip { font-size: 18px; color: #7b82a8; margin-bottom: 70px; }
+.bath-overlay-trip span { color: #ff6b6b; font-weight: 700; }
+.bath-overlay-stop { background: #c084fc; border: none; border-radius: 20px; padding: 22px 60px; color: #1a0030; font-size: 22px; font-weight: 700; cursor: pointer; font-family: inherit; -webkit-appearance: none; margin-bottom: 20px; }
+.bath-overlay-back { background: none; border: 1px solid #2e3350; border-radius: 14px; padding: 14px 32px; color: #7b82a8; font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit; -webkit-appearance: none; }
+
+/* LOG ITEM EDIT */
+.log-item { cursor: pointer; }
+.log-item:active { opacity: 0.7; }
+.log-edit-chevron { font-size: 14px; color: #3a4060; margin-left: 6px; }
+
+/* EDIT/DELETE SHEET */
+.edit-sheet-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 200; display: none; align-items: flex-end; justify-content: center; padding: 16px; }
+.edit-sheet-overlay.open { display: flex; }
+.edit-sheet { background: #1a1d27; border: 1px solid #2e3350; border-radius: 24px; padding: 24px; width: 100%; max-width: 520px; }
+.edit-sheet-title { font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #7b82a8; margin-bottom: 6px; }
+.edit-sheet-desc { font-size: 18px; font-weight: 600; color: #f0f2ff; margin-bottom: 20px; }
+.edit-sheet-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.edit-tardy-label { font-size: 14px; color: #7b82a8; margin-bottom: 8px; }
+.edit-tardy-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.sheet-btn { flex: 1; padding: 16px; border: none; border-radius: 12px; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.sheet-btn.delete { background: rgba(255,107,107,0.15); color: #ff6b6b; border: 1px solid rgba(255,107,107,0.3); }
+.sheet-btn.cancel { background: #22263a; color: #7b82a8; border: 1px solid #2e3350; }
+
+/* HISTORY */
+.history-section { padding: 0 16px 40px; }
+.section-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #7b82a8; margin-bottom: 10px; }
+.log-item { background: #1a1d27; border: 1px solid #2e3350; border-radius: 12px; padding: 13px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+.log-item-left { display: flex; align-items: center; gap: 10px; }
+.log-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.log-dot.cell { background: #f5a623; }
+.log-dot.tardy { background: #4fc3f7; }
+.log-dot.part { background: #81c995; }
+.log-dot.bath { background: #c084fc; }
+.log-text { font-size: 14px; color: #f0f2ff; }
+.log-time { font-size: 12px; color: #7b82a8; font-family: monospace; }
+.empty-log { color: #7b82a8; font-size: 14px; text-align: center; padding: 16px 0; }
+
+/* MODAL */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100; display: none; align-items: flex-end; justify-content: center; padding: 16px; }
+.modal-overlay.open { display: flex; }
+.modal { background: #1a1d27; border: 1px solid #2e3350; border-radius: 24px; padding: 26px; width: 100%; max-width: 520px; }
+.modal-title { font-size: 22px; font-weight: 700; color: #f0f2ff; margin-bottom: 6px; }
+.modal-sub { font-size: 14px; color: #7b82a8; margin-bottom: 18px; }
+.consequence-box { border-radius: 12px; padding: 16px; margin-bottom: 18px; }
+.consequence-box.red { background: rgba(255,107,107,0.12); border: 1px solid rgba(255,107,107,0.3); }
+.consequence-box.green { background: rgba(129,201,149,0.12); border: 1px solid rgba(129,201,149,0.3); }
+.consequence-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+.consequence-label.red { color: #ff6b6b; }
+.consequence-label.green { color: #81c995; }
+.consequence-text { font-size: 16px; font-weight: 600; color: #f0f2ff; }
+.consequence-detail { font-size: 13px; color: #7b82a8; margin-top: 4px; }
+.tardy-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.tardy-btn { background: #22263a; border: 1px solid #2e3350; border-radius: 10px; padding: 11px 14px; color: #f0f2ff; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; -webkit-appearance: none; appearance: none; }
+.tardy-btn.selected { background: rgba(79,195,247,0.15); border-color: #4fc3f7; color: #4fc3f7; }
+.modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+.btn-cancel { flex: 1; padding: 16px; background: #22263a; border: 1px solid #2e3350; border-radius: 12px; color: #7b82a8; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.btn-confirm { flex: 2; padding: 16px; border: none; border-radius: 12px; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.btn-confirm.cell { background: #f5a623; color: #1a0d00; }
+.btn-confirm.tardy { background: #4fc3f7; color: #001520; }
+.btn-confirm.part { background: #81c995; color: #001a08; }
+
+/* FULL LOG */
+.log-full-item { background: #1a1d27; border: 1px solid #2e3350; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 14px; }
+.log-full-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.log-full-icon.cell { background: rgba(245,166,35,0.15); }
+.log-full-icon.tardy { background: rgba(79,195,247,0.15); }
+.log-full-icon.part { background: rgba(129,201,149,0.15); }
+.log-full-icon.bath { background: rgba(192,132,252,0.15); }
+.log-full-name { font-size: 16px; font-weight: 600; color: #f0f2ff; }
+.log-full-detail { font-size: 13px; color: #7b82a8; margin-top: 2px; }
+.log-full-time { font-size: 12px; color: #7b82a8; font-family: monospace; text-align: right; margin-left: auto; white-space: nowrap; }
+.filter-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 16px 8px; }
+.filter-chip { padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; background: #1a1d27; border: 1px solid #2e3350; color: #7b82a8; cursor: pointer; font-family: inherit; -webkit-appearance: none; appearance: none; }
+.filter-chip.active { border-color: #6c7fff; color: #6c7fff; background: rgba(108,127,255,0.1); }
+.export-btn { display: block; margin: 4px 16px 24px; padding: 15px; border-radius: 12px; background: #22263a; border: 1px solid #2e3350; color: #7b82a8; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; width: calc(100% - 32px); text-align: center; -webkit-appearance: none; appearance: none; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(120px); background: #22263a; border: 1px solid #2e3350; border-radius: 14px; padding: 14px 22px; font-size: 15px; font-weight: 600; color: #f0f2ff; z-index: 200; transition: transform 0.3s ease; white-space: nowrap; max-width: 88vw; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+.toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- PERIODS -->
+<div id="screen-periods" class="screen active">
+  <div class="periods-hero">
+    <div class="app-title">McFadden Tracker</div>
+    <div class="app-date" id="hero-date"></div>
+  </div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" id="tab-btn-periods" onclick="switchTab('periods')">Periods</div>
+    <div class="nav-tab" id="tab-btn-log" onclick="switchTab('log')">Full Log</div>
+  </div>
+  <div class="scroll-content">
+    <div id="view-periods"><div class="period-grid" id="period-grid"></div></div>
+    <div id="view-log" style="display:none;">
+      <div class="filter-row" id="filter-row"></div>
+      <div style="padding:0 16px 8px;" id="full-log-list"></div>
+      <button class="export-btn" onclick="exportCSV()">⬇️ Export CSV</button>
+    </div>
+  </div>
+</div>
+
+<!-- ROSTER -->
+<div id="screen-roster" class="screen">
+  <div class="header">
+    <div class="back-btn" onclick="goTo('screen-periods');renderGrid();">←</div>
+    <div>
+      <div class="header-title" id="roster-title"></div>
+      <div class="header-sub" id="roster-sub"></div>
+    </div>
+  </div>
+  <div id="out-banner" style="display:none;" class="out-banner">
+    <div class="out-banner-left">
+      <div class="out-dot"></div>
+      <div>
+        <div class="out-name" id="out-banner-name"></div>
+        <div class="out-timer" id="out-banner-timer">0:00</div>
+      </div>
+    </div>
+    <button class="out-stop-btn" onclick="stopBathFromBanner()">✓ Back</button>
+  </div>
+  <div class="stats-strip" id="period-stats"></div>
+  <div class="roster-scroll">
+    <input class="search-bar" type="search" id="search-input" placeholder="🔍  Search students…" oninput="filterStudents()" autocomplete="off" autocorrect="off" autocapitalize="off">
+    <div class="student-list" id="student-list"></div>
+  </div>
+</div>
+
+<!-- STUDENT -->
+<div id="screen-student" class="screen">
+  <div class="header">
+    <div class="back-btn" id="student-back">←</div>
+    <div>
+      <div class="header-title" id="student-header-name"></div>
+      <div class="header-sub" id="student-header-period"></div>
+    </div>
+  </div>
+  <div class="student-hero">
+    <div class="student-hero-name" id="student-hero-name"></div>
+    <div class="student-hero-period" id="student-hero-period"></div>
+  </div>
+  <div class="scroll-content">
+    <div class="action-grid" id="action-grid"></div>
+    <div class="history-section">
+      <div class="section-label">Recent Incidents</div>
+      <div id="student-log-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-sub" id="modal-sub"></div>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-confirm cell" id="modal-confirm" onclick="confirmIncident()">Log It</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- FULLSCREEN BATHROOM OVERLAY -->
+<div class="bath-overlay" id="bath-overlay">
+  <div class="bath-overlay-label">🚻 Bathroom Pass</div>
+  <div class="bath-overlay-name" id="bo-name"></div>
+  <div class="bath-overlay-period" id="bo-period"></div>
+  <div class="bath-overlay-clock" id="bo-clock">0:00</div>
+  <div class="bath-overlay-trip" id="bo-trip"></div>
+  <button class="bath-overlay-stop" onclick="stopBath()">✓ Student is Back</button>
+  <button class="bath-overlay-back" onclick="closeBathOverlay()">← Back to Roster</button>
+</div>
+
+<!-- EDIT / DELETE SHEET -->
+<div class="edit-sheet-overlay" id="edit-sheet">
+  <div class="edit-sheet">
+    <div class="edit-sheet-title" id="es-title"></div>
+    <div class="edit-sheet-desc" id="es-desc"></div>
+    <div id="es-body"></div>
+    <div class="edit-sheet-row">
+      <button class="sheet-btn delete" onclick="deleteEntry()">🗑 Delete</button>
+      <button class="sheet-btn cancel" onclick="closeEditSheet()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var ROSTER = {
+  2:["Ajay","Aleida","Alex","Ami","Anthony","Autumn C","Chris Y","Cora","Dashleen","Elle","Emiliano","Giselle","Jade V","Jaime","Jay S-F","Jayda","Jessica R M","Kemiyah","Kurt","Maaz","Maiyah","Marcos","Nayeli","Reycelly","Rita","Sa'Myiah","Sofia M","Susana","X'Zavier","Zion"],
+  3:["Aiden","Amari","Armando","Blythe","Catalina","Kota","Dharamjit","Ella","Emma D","Isa","Ismael","Jayden","Jude","Jynnaleiah","Kalia","Kenzie","Koraline","Kylie","Laurel","Lyra","Maximus","Meah","Michael-Anthony","Miguel","Mira","Nahomi","Nayana","Rosa","Sam","Samone","Sophia M","Vincent"],
+  4:["Adam","Amayah","Arianna","Audriana","Caesar","Conner","Dalton","Darla","Davion","Eli","Enevaeh","Gabriel","Giancarlo","Isaac","Izzy","Jade S","Jay M","Jessica Q","JJ","Khris","Logan","Lucy","Luis","Maddie","Makena","Roman","Sameera","Sara","Solei","Sophia V","Uriah","Victoria"],
+  5:["Aiden","Aiyanna","Alan P","Alan V","Alejandro","Azmodin","Bella","Ben","Bernice","Daniel","Deon","Einez","Emily","Emma C","Esteban","Estella","Estevan","Gen","Gerardo","Jackson","Jocelyn","Kate","Lamarr","Lily","Macivia","Mason","Reese","Richard","Scotty","Sophia T","Sukhman"],
+  6:["A'aleyha","Abigale","Alex","Angel","Ashlynn","Benji","Brooklyn","Chris M","Christian","Cleo","Collin","Ellington","Emery","Ethanael","Evelyn","Hamdy","Isaiah","Jordan","Joseph","Karyme","Leo","Lili","Monica","Mya","Natalie","Natalie V","Nikol","Noah","Prechea","Rigo","Tatyanna","Troy","Zara"]
+};
+
+var PERIODS = [
+  {id:1,label:"1st Period Prep",time:"8:30 – 9:27am",start:"8:30",prep:true},
+  {id:2,label:"Period 2",time:"9:34 – 10:35am",start:"9:34"},
+  {id:3,label:"Period 3",time:"10:42 – 11:39am",start:"10:42"},
+  {id:4,label:"Period 4",time:"11:46am – 12:43pm",start:"11:46"},
+  {id:5,label:"Period 5",time:"1:27 – 2:24pm",start:"13:27"},
+  {id:6,label:"Period 6",time:"2:31 – 3:28pm",start:"14:31"}
+];
+
+var CONS = [
+  {label:"1st offense",detail:"Hold until end of class"},
+  {label:"2nd offense",detail:"Hold until end of day"},
+  {label:"3rd offense",detail:"Climate Office — detention assigned"},
+  {label:"4th+ offense",detail:"Parent must come pick it up"}
+];
+
+// Quarter definitions — add Q1/Q2/Q3 dates later
+var QUARTERS = [
+  {q:4, start: new Date('2026-04-06'), end: new Date('2026-06-30')}
+];
+
+function getCurrentQuarter() {
+  var now = new Date();
+  for(var i=0;i<QUARTERS.length;i++){
+    if(now >= QUARTERS[i].start && now <= QUARTERS[i].end) return QUARTERS[i].q;
+  }
+  return 4; // default
+}
+
+// ── STATE ──
+var log = [];
+var bathLog = []; // completed bath trips
+var activeOut = null; // {period, student, startTime}
+
+try {
+  var saved = localStorage.getItem('mcfadden-v3');
+  if(saved){
+    var d = JSON.parse(saved);
+    log = d.log || [];
+    bathLog = d.bathLog || [];
+    // restore active session if page was reloaded
+    if(d.activeOut) activeOut = d.activeOut;
+  }
+} catch(e){}
+
+var cur = {period:null, student:null, mtype:null, tardyMin:null};
+var activeFilter = 'all';
+var timerInterval = null;
+
+function save(){
+  try {
+    localStorage.setItem('mcfadden-v3', JSON.stringify({log:log, bathLog:bathLog, activeOut:activeOut}));
+  } catch(e){}
+}
+
+// ── HELPERS ──
+function cnt(pid,name,type){ var n=0; for(var i=0;i<log.length;i++) if(log[i].period===pid&&log[i].student===name&&log[i].type===type) n++; return n; }
+
+function bathTripsThisQuarter(pid,name){
+  var q = getCurrentQuarter();
+  var trips=[];
+  for(var i=0;i<bathLog.length;i++){
+    var b=bathLog[i];
+    if(b.period===pid&&b.student===name&&b.quarter===q) trips.push(b);
+  }
+  return trips;
+}
+
+function timeOwedSeconds(pid,name){
+  var trips = bathTripsThisQuarter(pid,name);
+  var owed=0;
+  for(var i=3;i<trips.length;i++) owed+=trips[i].durationSecs;
+  return owed;
+}
+
+function fmtSecs(s){
+  s=Math.floor(s);
+  var m=Math.floor(s/60), sec=s%60;
+  return m+':'+(sec<10?'0':'')+sec;
+}
+
+function fmtMins(s){
+  s=Math.floor(s);
+  var m=Math.floor(s/60), sec=s%60;
+  if(m===0) return sec+'s';
+  return m+'m '+(sec>0?sec+'s':'');
+}
+
+function pTot(pid){
+  var c=0,t=0,p=0;
+  for(var i=0;i<log.length;i++){
+    if(log[i].period===pid){
+      if(log[i].type==='cell')c++;
+      else if(log[i].type==='tardy')t++;
+      else if(log[i].type==='part')p++;
+    }
+  }
+  var baths=0;
+  for(var i=0;i<bathLog.length;i++) if(bathLog[i].period===pid) baths++;
+  return {cell:c,tardy:t,part:p,bath:baths,total:c+t+p};
+}
+
+function fmtTime(ts){ var d=new Date(ts),h=d.getHours(),m=d.getMinutes(),ap=h>=12?'pm':'am'; return (h%12||12)+':'+(m<10?'0':'')+m+' '+ap; }
+function fmtDate(ts){ var d=new Date(ts),mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return mo[d.getMonth()]+' '+d.getDate(); }
+function minsLate(pid){
+  var p=getPeriod(pid); if(!p||p.prep) return 0;
+  var parts=p.start.split(':'),startM=parseInt(parts[0])*60+parseInt(parts[1]);
+  var now=new Date(),nowM=now.getHours()*60+now.getMinutes();
+  return Math.max(0,Math.min(nowM-startM,60));
+}
+function getPeriod(pid){ for(var i=0;i<PERIODS.length;i++) if(PERIODS[i].id===pid) return PERIODS[i]; return null; }
+
+function goTo(id){
+  var screens=document.querySelectorAll('.screen');
+  for(var i=0;i<screens.length;i++) screens[i].classList.remove('active');
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// ── BATHROOM LOGIC ──
+function startBath(pid, name){
+  if(activeOut){ showToast('⚠️ '+activeOut.student+' is already out!'); return; }
+  activeOut = {period:pid, student:name, startTime:Date.now()};
+  save();
+  startBannerTimer();
+  refreshStudent();
+  renderStudentList(document.getElementById('search-input').value);
+  showToast('🚻 '+name+' left for bathroom');
+  openBathOverlay();
+}
+
+function openBathOverlay(){
+  if(!activeOut) return;
+  var pid=activeOut.period, name=activeOut.student;
+  var p=getPeriod(pid);
+  document.getElementById('bo-name').textContent=name;
+  document.getElementById('bo-period').textContent=p.label+' · '+p.time;
+  var trips=bathTripsThisQuarter(pid,name);
+  var tripNum=trips.length+1;
+  var el=document.getElementById('bo-trip');
+  if(tripNum>3){ el.innerHTML='Trip #'+tripNum+' — <span>Time will be owed</span>'; }
+  else { el.textContent='Trip #'+tripNum+' of 3 free'; }
+  document.getElementById('bo-clock').textContent=fmtSecs((Date.now()-activeOut.startTime)/1000);
+  document.getElementById('bath-overlay').classList.add('open');
+}
+
+function closeBathOverlay(){
+  document.getElementById('bath-overlay').classList.remove('open');
+}
+
+function stopBath(){
+  if(!activeOut) return;
+  var duration = Math.floor((Date.now() - activeOut.startTime)/1000);
+  var q = getCurrentQuarter();
+  var trips = bathTripsThisQuarter(activeOut.period, activeOut.student);
+  var tripNum = trips.length + 1;
+  var isOwed = tripNum > 3;
+
+  bathLog.push({
+    id: Date.now(),
+    period: activeOut.period,
+    student: activeOut.student,
+    startTime: activeOut.startTime,
+    endTime: Date.now(),
+    durationSecs: duration,
+    tripNum: tripNum,
+    isOwed: isOwed,
+    quarter: q
+  });
+
+  var name = activeOut.student;
+  activeOut = null;
+  save();
+  stopBannerTimer();
+  hideBanner();
+  closeBathOverlay();
+
+  var msg = '🚻 '+name+' back — '+fmtMins(duration);
+  if(isOwed) msg += ' (time owed!)';
+  showToast(msg);
+
+  refreshStudent();
+  renderStudentList(document.getElementById('search-input').value);
+  renderGrid();
+}
+
+function stopBathFromBanner(){
+  stopBath();
+}
+
+function startBannerTimer(){
+  updateBanner();
+  timerInterval = setInterval(function(){
+    updateBanner();
+    if(activeOut){
+      var elapsed=fmtSecs((Date.now()-activeOut.startTime)/1000);
+      var oc=document.getElementById('bo-clock');
+      if(oc) oc.textContent=elapsed;
+      var timerEl=document.getElementById('live-bath-timer');
+      if(timerEl) timerEl.textContent=elapsed;
+    }
+  }, 1000);
+}
+
+function stopBannerTimer(){
+  if(timerInterval){ clearInterval(timerInterval); timerInterval=null; }
+}
+
+function updateBanner(){
+  if(!activeOut){ hideBanner(); return; }
+  var el = document.getElementById('out-banner');
+  el.style.display = 'flex';
+  document.getElementById('out-banner-name').textContent = activeOut.student + ' is out';
+  document.getElementById('out-banner-timer').textContent = fmtSecs((Date.now()-activeOut.startTime)/1000);
+}
+
+function hideBanner(){
+  document.getElementById('out-banner').style.display='none';
+}
+
+// restore timer if page was reloaded mid-session
+if(activeOut) startBannerTimer();
+
+// ── PERIODS ──
+function renderGrid(){
+  var g=document.getElementById('period-grid'); g.innerHTML='';
+  for(var i=0;i<PERIODS.length;i++){
+    var p=PERIODS[i],t=pTot(p.id);
+    var students=ROSTER[p.id];
+    var countStr=students?students.length+' students':'Prep period';
+    var card=document.createElement('div');
+    card.className='period-card'+(p.prep?' prep':'');
+    card.innerHTML='<div><div class="period-name">'+p.label+'</div><div class="period-time">'+p.time+'</div></div>'+
+      '<div class="period-right"><span class="period-count">'+countStr+'</span>'+
+      (t.total>0?'<span class="period-badge">'+t.total+'</span>':'')+
+      '<span class="chevron">›</span></div>';
+    if(!p.prep){ (function(pid){ card.onclick=function(){ openPeriod(pid); }; })(p.id); }
+    g.appendChild(card);
+  }
+}
+
+function switchTab(tab){
+  document.getElementById('tab-btn-periods').className='nav-tab'+(tab==='periods'?' active':'');
+  document.getElementById('tab-btn-log').className='nav-tab'+(tab==='log'?' active':'');
+  document.getElementById('view-periods').style.display=tab==='periods'?'block':'none';
+  document.getElementById('view-log').style.display=tab==='log'?'block':'none';
+  if(tab==='log'){ renderFilters(); renderFullLog(); }
+}
+
+function renderFilters(){
+  var row=document.getElementById('filter-row'); row.innerHTML='';
+  var filters=[['all','All'],['cell','📱 Cell'],['tardy','🕐 Tardy'],['part','💤 Part'],['bath','🚻 Bathroom']];
+  for(var i=0;i<filters.length;i++){
+    var chip=document.createElement('button');
+    chip.className='filter-chip'+(activeFilter===filters[i][0]?' active':'');
+    chip.textContent=filters[i][1];
+    (function(k){ chip.onclick=function(){ activeFilter=k; renderFilters(); renderFullLog(); }; })(filters[i][0]);
+    row.appendChild(chip);
+  }
+}
+
+function renderFullLog(){
+  var el=document.getElementById('full-log-list');
+  var icons={cell:'📱',tardy:'🕐',part:'💤',bath:'🚻'};
+
+  // combine log + bathLog into one sorted list
+  var combined = [];
+  for(var i=0;i<log.length;i++) combined.push({source:'log',data:log[i],ts:log[i].timestamp});
+  for(var i=0;i<bathLog.length;i++) combined.push({source:'bath',data:bathLog[i],ts:bathLog[i].endTime});
+  combined.sort(function(a,b){ return b.ts-a.ts; });
+
+  if(activeFilter!=='all'){
+    var f=[];
+    for(var i=0;i<combined.length;i++){
+      var type = combined[i].source==='bath'?'bath':combined[i].data.type;
+      if(type===activeFilter) f.push(combined[i]);
+    }
+    combined=f;
+  }
+
+  if(!combined.length){ el.innerHTML='<div class="empty-log">No incidents logged yet</div>'; return; }
+  var html='';
+  for(var i=0;i<combined.length;i++){
+    var item=combined[i];
+    var type,name,detail,ts;
+    if(item.source==='bath'){
+      var b=item.data;
+      type='bath'; name=b.student; ts=b.endTime;
+      detail='🚻 Trip #'+b.tripNum+' — '+fmtMins(b.durationSecs)+(b.isOwed?' ⚠️ time owed':'')+' — Period '+b.period;
+    } else {
+      var e=item.data;
+      type=e.type; name=e.student; ts=e.timestamp;
+      detail=type==='tardy'?e.minutes+' min late — Period '+e.period:'Period '+e.period;
+    }
+    html+='<div class="log-full-item"><div class="log-full-icon '+type+'">'+icons[type]+'</div>'+
+      '<div><div class="log-full-name">'+name+'</div><div class="log-full-detail">'+detail+'</div></div>'+
+      '<div class="log-full-time">'+fmtDate(ts)+'<br>'+fmtTime(ts)+'</div></div>';
+  }
+  el.innerHTML=html;
+}
+
+// ── ROSTER ──
+function openPeriod(pid){
+  cur.period=pid;
+  var p=getPeriod(pid);
+  document.getElementById('roster-title').textContent=p.label;
+  document.getElementById('roster-sub').textContent=p.time;
+  renderStats(pid);
+  renderStudentList('');
+  document.getElementById('search-input').value='';
+  if(activeOut && activeOut.period===pid) updateBanner();
+  else hideBanner();
+  goTo('screen-roster');
+}
+
+function renderStats(pid){
+  var t=pTot(pid);
+  document.getElementById('period-stats').innerHTML=
+    '<div class="stat-pill"><div class="stat-num cell">'+t.cell+'</div><div class="stat-lbl">Cell</div></div>'+
+    '<div class="stat-pill"><div class="stat-num tardy">'+t.tardy+'</div><div class="stat-lbl">Tardies</div></div>'+
+    '<div class="stat-pill"><div class="stat-num part">'+t.part+'</div><div class="stat-lbl">Part.</div></div>'+
+    '<div class="stat-pill"><div class="stat-num bath">'+t.bath+'</div><div class="stat-lbl">Bath</div></div>';
+}
+
+function renderStudentList(q){
+  var pid=cur.period, students=ROSTER[pid]||[], el=document.getElementById('student-list');
+  el.innerHTML='';
+  for(var i=0;i<students.length;i++){
+    var name=students[i];
+    if(name.toLowerCase().indexOf(q.toLowerCase())===-1) continue;
+    var c=cnt(pid,name,'cell'),t=cnt(pid,name,'tardy'),p=cnt(pid,name,'part');
+    var trips=bathTripsThisQuarter(pid,name);
+    var owed=timeOwedSeconds(pid,name);
+    var isOut = activeOut && activeOut.period===pid && activeOut.student===name;
+
+    var card=document.createElement('div');
+    card.className='student-card'+(isOut?' out':'');
+    var badges=(c?'<span class="badge badge-cell">📱 '+c+'</span>':'')+
+      (t?'<span class="badge badge-tardy">🕐 '+t+'</span>':'')+
+      (p?'<span class="badge badge-part">💤 '+p+'</span>':'')+
+      (trips.length?'<span class="badge badge-bath">🚻 '+trips.length+'</span>':'')+
+      (owed>0?'<span class="badge badge-owed">⏱ '+fmtMins(owed)+' owed</span>':'');
+    card.innerHTML='<div class="student-name">'+name+(isOut?' 🚻':'')+'</div>'+
+      '<div class="student-badges">'+(badges||'<span class="no-issues">No issues</span>')+
+      '<span class="chevron" style="font-size:20px;margin-left:4px">›</span></div>';
+    (function(n,out){ card.onclick=function(){ if(out){ openBathOverlay(); } else { openStudent(n); } }; })(name,isOut);
+    el.appendChild(card);
+  }
+}
+
+function filterStudents(){ renderStudentList(document.getElementById('search-input').value); }
+
+// ── STUDENT ──
+function openStudent(name){
+  cur.student=name;
+  var pid=cur.period, p=getPeriod(pid);
+  document.getElementById('student-header-name').textContent=name;
+  document.getElementById('student-header-period').textContent=p.label;
+  document.getElementById('student-hero-name').textContent=name;
+  document.getElementById('student-hero-period').textContent=p.label+' · '+p.time;
+  document.getElementById('student-back').onclick=function(){
+    renderStudentList(document.getElementById('search-input').value);
+    renderStats(pid);
+    if(activeOut && activeOut.period===pid) updateBanner();
+    else hideBanner();
+    goTo('screen-roster');
+  };
+  refreshStudent();
+  goTo('screen-student');
+}
+
+function refreshStudent(){
+  var pid=cur.period, name=cur.student;
+  if(!pid||!name) return;
+  var c=cnt(pid,name,'cell'),t=cnt(pid,name,'tardy'),p=cnt(pid,name,'part');
+  var cons=CONS[Math.min(c,CONS.length-1)];
+  var trips=bathTripsThisQuarter(pid,name);
+  var owed=timeOwedSeconds(pid,name);
+  var isOut = activeOut && activeOut.period===pid && activeOut.student===name;
+  var tripNum = trips.length + (isOut?1:0);
+
+  var bathStatus='';
+  if(isOut){
+    bathStatus='<div class="bath-timer-display" id="live-bath-timer">'+fmtSecs((Date.now()-activeOut.startTime)/1000)+'</div>';
+  } else {
+    bathStatus='<button class="bath-btn" onclick="startBath('+pid+',\''+name.replace(/'/g,"\\'")+'\')">'+(tripNum>=3?'⚠️ ':'')+'Start</button>';
+  }
+
+  var bathSubText = '';
+  if(trips.length===0) bathSubText='No trips this quarter';
+  else if(trips.length<=3) bathSubText=trips.length+' of 3 free trips used';
+  else bathSubText=trips.length+' trips — '+fmtMins(owed)+' time owed';
+
+  document.getElementById('action-grid').innerHTML=
+    '<div class="action-card cell" onclick="openModal(\'cell\')">'+
+      '<div class="action-icon">📱</div>'+
+      '<div><div class="action-label">Cell Phone</div>'+
+      '<div class="action-count">'+(c===0?'No incidents':c+' time'+(c>1?'s':'')+' — '+cons.label+' up next')+'</div></div>'+
+      '<div class="action-arrow">›</div></div>'+
+    '<div class="action-card tardy" onclick="openModal(\'tardy\')">'+
+      '<div class="action-icon">🕐</div>'+
+      '<div><div class="action-label">Tardy</div>'+
+      '<div class="action-count">'+(t===0?'No tardies':t+' tardy'+(t>1?'s':'')+' logged')+'</div></div>'+
+      '<div class="action-arrow">›</div></div>'+
+    '<div class="action-card part" onclick="openModal(\'part\')">'+
+      '<div class="action-icon">💤</div>'+
+      '<div><div class="action-label">Participation</div>'+
+      '<div class="action-count">'+(p===0?'No reminders':'Reminded '+p+' time'+(p>1?'s':''))+'</div></div>'+
+      '<div class="action-arrow">›</div></div>'+
+    '<div class="action-card bath'+(isOut?' active-out':'')+'"'+(isOut?' onclick="openBathOverlay()"':'')+'>'+
+      '<div class="action-icon">🚻</div>'+
+      '<div style="flex:1"><div class="action-label">Bathroom</div>'+
+      '<div class="action-count">'+bathSubText+'</div></div>'+
+      (isOut?
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">'+
+          '<div id="live-bath-timer" style="font-size:26px;font-weight:700;color:#c084fc;font-family:monospace;">'+fmtSecs((Date.now()-activeOut.startTime)/1000)+'</div>'+
+          '<button class="bath-btn stop" onclick="event.stopPropagation();stopBath()">✓ Back</button>'+
+        '</div>'
+        :bathStatus)+
+    '</div>';
+
+  // log
+  var entries=[]; var allEntries=[];
+  for(var i=0;i<log.length;i++) if(log[i].period===pid&&log[i].student===name) allEntries.push({source:'log',data:log[i],ts:log[i].timestamp});
+  for(var i=0;i<bathLog.length;i++) if(bathLog[i].period===pid&&bathLog[i].student===name) allEntries.push({source:'bath',data:bathLog[i],ts:bathLog[i].endTime});
+  allEntries.sort(function(a,b){return b.ts-a.ts;});
+  entries=allEntries.slice(0,8);
+
+  var el=document.getElementById('student-log-list');
+  if(!entries.length){ el.innerHTML='<div class="empty-log">No incidents yet</div>'; return; }
+  var html='';
+  for(var i=0;i<entries.length;i++){
+    var item=entries[i];
+    var lbl,type,ts,entryId,src;
+    src=item.source;
+    if(src==='bath'){
+      var b=item.data; type='bath'; ts=b.endTime; entryId=b.id;
+      lbl='🚻 Trip #'+b.tripNum+' — '+fmtMins(b.durationSecs)+(b.isOwed?' ⚠️':'');
+    } else {
+      var e=item.data; type=e.type; ts=e.timestamp; entryId=e.id;
+      lbl=type==='cell'?'Cell phone use':type==='tardy'?'Tardy — '+e.minutes+' min late':'Participation reminder';
+    }
+    html+='<div class="log-item" onclick="openEditSheet('+entryId+',&quot;'+src+'&quot;)">'+
+      '<div class="log-item-left"><div class="log-dot '+type+'"></div><div class="log-text">'+lbl+'</div></div>'+
+      '<div style="display:flex;align-items:center;gap:6px"><div class="log-time">'+fmtTime(ts)+'</div><div class="log-edit-chevron">✏️</div></div></div>';
+  }
+  el.innerHTML=html;
+}
+
+// ── EDIT / DELETE SHEET ──
+var editTarget = null; // {id, source}
+
+function openEditSheet(id, source){
+  editTarget = {id:id, source:source};
+  var item=null;
+  if(source==='bath'){
+    for(var i=0;i<bathLog.length;i++) if(bathLog[i].id===id){item=bathLog[i];break;}
+  } else {
+    for(var i=0;i<log.length;i++) if(log[i].id===id){item=log[i];break;}
+  }
+  if(!item) return;
+
+  var title,desc,body='';
+  if(source==='bath'){
+    title='BATHROOM TRIP #'+item.tripNum;
+    desc=item.student+' — '+fmtMins(item.durationSecs)+(item.isOwed?' (time owed)':'');
+    // Allow editing duration in minutes
+    var durMins=Math.round(item.durationSecs/60);
+    body='<div class="edit-tardy-label">Edit duration (minutes):</div>'+
+      '<div class="edit-tardy-grid" id="edit-dur-grid">';
+    for(var m=1;m<=20;m++){
+      body+='<button class="tardy-btn'+(durMins===m?' selected':'')+'" onclick="selEditDur(this,'+m+')">'+m+'</button>';
+    }
+    body+='</div>'+
+      '<button class="sheet-btn" style="background:rgba(192,132,252,0.15);color:#c084fc;border:1px solid rgba(192,132,252,0.3);margin-bottom:10px;width:100%;padding:14px;" onclick="saveEditDur()">Save Duration</button>';
+  } else {
+    var typeLabels={cell:'📱 Cell Phone',tardy:'🕐 Tardy',part:'💤 Participation'};
+    title=typeLabels[item.type]||item.type.toUpperCase();
+    desc=item.student+' — '+fmtTime(item.timestamp);
+    if(item.type==='tardy'){
+      body='<div class="edit-tardy-label">Edit minutes late:</div>'+
+        '<div class="edit-tardy-grid" id="edit-tardy-grid">';
+      var mins=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16];
+      for(var j=0;j<mins.length;j++){
+        var lbl=mins[j]===16?'15+':mins[j];
+        body+='<button class="tardy-btn'+(item.minutes===mins[j]?' selected':'')+'" onclick="selEditTardy(this,'+mins[j]+')">'+lbl+'</button>';
+      }
+      body+='</div>'+
+        '<button class="sheet-btn" style="background:rgba(79,195,247,0.15);color:#4fc3f7;border:1px solid rgba(79,195,247,0.3);margin-bottom:10px;width:100%;padding:14px;" onclick="saveEditTardy()">Save Minutes</button>';
+    }
+  }
+
+  document.getElementById('es-title').textContent=title;
+  document.getElementById('es-desc').textContent=desc;
+  document.getElementById('es-body').innerHTML=body;
+  document.getElementById('edit-sheet').classList.add('open');
+}
+
+function closeEditSheet(){
+  document.getElementById('edit-sheet').classList.remove('open');
+  editTarget=null;
+}
+
+var editSelDur=null, editSelTardy=null;
+function selEditDur(el,m){ document.querySelectorAll('#edit-dur-grid .tardy-btn').forEach(function(b){b.classList.remove('selected');}); el.classList.add('selected'); editSelDur=m; }
+function selEditTardy(el,m){ document.querySelectorAll('#edit-tardy-grid .tardy-btn').forEach(function(b){b.classList.remove('selected');}); el.classList.add('selected'); editSelTardy=m; }
+
+function saveEditDur(){
+  if(!editSelDur||!editTarget) return;
+  for(var i=0;i<bathLog.length;i++){
+    if(bathLog[i].id===editTarget.id){
+      bathLog[i].durationSecs=editSelDur*60;
+      // recalc isOwed
+      bathLog[i].isOwed=bathLog[i].tripNum>3;
+      break;
+    }
+  }
+  save(); closeEditSheet(); refreshStudent(); renderGrid();
+  showToast('✅ Duration updated');
+  editSelDur=null;
+}
+
+function saveEditTardy(){
+  if(!editSelTardy||!editTarget) return;
+  for(var i=0;i<log.length;i++){
+    if(log[i].id===editTarget.id){ log[i].minutes=editSelTardy; break; }
+  }
+  save(); closeEditSheet(); refreshStudent(); renderGrid();
+  showToast('✅ Tardy updated');
+  editSelTardy=null;
+}
+
+function deleteEntry(){
+  if(!editTarget) return;
+  if(editTarget.source==='bath'){
+    var newBath=[];
+    for(var i=0;i<bathLog.length;i++) if(bathLog[i].id!==editTarget.id) newBath.push(bathLog[i]);
+    // renumber trips for that student/period
+    var pid=null,name=null;
+    for(var i=0;i<bathLog.length;i++) if(bathLog[i].id===editTarget.id){pid=bathLog[i].period;name=bathLog[i].student;break;}
+    var tripCount=0;
+    for(var i=0;i<newBath.length;i++){
+      if(newBath[i].period===pid&&newBath[i].student===name){
+        tripCount++;
+        newBath[i].tripNum=tripCount;
+        newBath[i].isOwed=tripCount>3;
+      }
+    }
+    bathLog=newBath;
+  } else {
+    var newLog=[];
+    for(var i=0;i<log.length;i++) if(log[i].id!==editTarget.id) newLog.push(log[i]);
+    log=newLog;
+  }
+  save(); closeEditSheet(); refreshStudent(); renderGrid();
+  showToast('🗑 Entry deleted');
+}
+
+// ── MODAL ──
+function openModal(type){
+  cur.mtype=type; cur.tardyMin=null;
+  var pid=cur.period,name=cur.student;
+  var titles={cell:'📱 Cell Phone Use',tardy:'🕐 Mark Tardy',part:'💤 Participation'};
+  document.getElementById('modal-title').textContent=titles[type];
+  document.getElementById('modal-sub').textContent='Logging for '+name;
+  var confirm=document.getElementById('modal-confirm');
+  confirm.className='btn-confirm '+type;
+  var body='';
+  if(type==='cell'){
+    var c=cnt(pid,name,'cell'),cons=CONS[Math.min(c,CONS.length-1)];
+    confirm.textContent='Log Cell Phone';
+    body='<div class="consequence-box red"><div class="consequence-label red">⚠️ Consequence for Offense #'+(c+1)+'</div>'+
+      '<div class="consequence-text">'+cons.label+'</div><div class="consequence-detail">'+cons.detail+'</div></div>';
+  } else if(type==='tardy'){
+    var auto=minsLate(pid);
+    if(auto>0) cur.tardyMin=auto;
+    confirm.textContent='Log Tardy';
+    var btns=''; var mins=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,'15+'];
+    for(var i=0;i<mins.length;i++){
+      var val=mins[i]==='15+'?16:mins[i];
+      btns+='<button class="tardy-btn'+(auto===val?' selected':'')+'" onclick="selTardy(this,'+val+')">'+mins[i]+'</button>';
+    }
+    body='<div class="tardy-grid">'+btns+'</div>';
+  } else {
+    var p=cnt(pid,name,'part');
+    confirm.textContent='Log Reminder';
+    body='<div class="consequence-box green"><div class="consequence-label green">📋 This period so far</div>'+
+      '<div class="consequence-text">'+(p===0?'First reminder':p+' previous reminder'+(p>1?'s':''))+'</div>'+
+      '<div class="consequence-detail">Sleeping, not participating, or avoiding pair share</div></div>';
+  }
+  document.getElementById('modal-body').innerHTML=body;
+  document.getElementById('modal').classList.add('open');
+}
+
+function selTardy(el,m){
+  var btns=document.querySelectorAll('.tardy-btn');
+  for(var i=0;i<btns.length;i++) btns[i].classList.remove('selected');
+  el.classList.add('selected'); cur.tardyMin=m;
+}
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+
+function confirmIncident(){
+  if(cur.mtype==='tardy'&&!cur.tardyMin){ showToast('⚠️ Please select minutes late'); return; }
+  log.push({id:Date.now(),period:cur.period,student:cur.student,type:cur.mtype,minutes:cur.tardyMin||null,timestamp:Date.now()});
+  save(); closeModal(); refreshStudent(); renderGrid();
+  var msgs={cell:'📱 Cell logged for '+cur.student,tardy:'🕐 '+cur.tardyMin+' min tardy — '+cur.student,part:'💤 Participation logged for '+cur.student};
+  showToast(msgs[cur.mtype]);
+}
+
+// ── EXPORT ──
+function exportCSV(){
+  var rows=[['Date','Time','Period','Student','Type','Detail','Quarter']];
+  for(var i=0;i<log.length;i++){
+    var e=log[i];
+    var detail=e.type==='tardy'?e.minutes+' min late':'';
+    rows.push([fmtDate(e.timestamp),fmtTime(e.timestamp),e.period,e.student,e.type,detail,'']);
+  }
+  for(var i=0;i<bathLog.length;i++){
+    var b=bathLog[i];
+    var detail2='Trip #'+b.tripNum+' — '+fmtMins(b.durationSecs)+(b.isOwed?' (time owed)':'');
+    rows.push([fmtDate(b.endTime),fmtTime(b.endTime),b.period,b.student,'bathroom',detail2,'Q'+b.quarter]);
+  }
+  if(rows.length===1){ showToast('No data to export yet'); return; }
+  var csv='';
+  for(var i=0;i<rows.length;i++){
+    var row=[];
+    for(var j=0;j<rows[i].length;j++) row.push('"'+String(rows[i][j]).replace(/"/g,'""')+'"');
+    csv+=row.join(',')+'\n';
+  }
+  var blob=new Blob([csv],{type:'text/csv'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download='mcfadden-log.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast('✅ CSV exported!');
+}
+
+// ── TOAST ──
+var toastTimer;
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){ t.classList.remove('show'); },2800);
+}
+
+// ── INIT ──
+var now=new Date();
+var days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+document.getElementById('hero-date').textContent=days[now.getDay()]+', '+months[now.getMonth()]+' '+now.getDate();
+renderGrid();
+</script>
+</body>
+</html>
