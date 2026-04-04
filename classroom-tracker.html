@@ -30,8 +30,19 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #0f
 .period-grid { padding: 8px 16px 32px; display: flex; flex-direction: column; gap: 12px; }
 .period-card { background: #1a1d27; border: 1px solid #2e3350; border-left: 4px solid #6c7fff; border-radius: 16px; padding: 20px 18px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
 .period-card.prep { border-left-color: #2e3350; opacity: 0.5; }
+.period-card.p2 { border-left-color: #e05252; }
+.period-card.p3 { border-left-color: #e07c32; }
+.period-card.p4 { border-left-color: #4caf7d; }
+.period-card.p5 { border-left-color: #4f9fd4; }
+.period-card.p6 { border-left-color: #a374d4; }
 .period-name { font-size: 20px; font-weight: 700; color: #f0f2ff; }
 .period-time { font-size: 14px; color: #7b82a8; margin-top: 4px; }
+.period-pill { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-right: 6px; }
+.period-pill.p2 { background: rgba(224,82,82,0.18); color: #e05252; }
+.period-pill.p3 { background: rgba(224,124,50,0.18); color: #e07c32; }
+.period-pill.p4 { background: rgba(76,175,125,0.18); color: #4caf7d; }
+.period-pill.p5 { background: rgba(79,159,212,0.18); color: #4f9fd4; }
+.period-pill.p6 { background: rgba(163,116,212,0.18); color: #a374d4; }
 .period-right { display: flex; align-items: center; gap: 10px; }
 .period-count { font-size: 13px; color: #7b82a8; background: #22263a; padding: 5px 11px; border-radius: 20px; }
 .period-badge { background: #ff6b6b; color: white; width: 24px; height: 24px; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
@@ -48,7 +59,7 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #0f
 .stat-lbl { font-size: 11px; color: #7b82a8; margin-top: 2px; }
 
 /* BATHROOM OUT BANNER */
-.out-banner { background: rgba(192,132,252,0.12); border-bottom: 1px solid rgba(192,132,252,0.3); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.out-banner { background: rgba(192,132,252,0.12); border-bottom: 1px solid rgba(192,132,252,0.3); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; position: sticky; top: 0; z-index: 9; cursor: pointer; }
 .out-banner-left { display: flex; align-items: center; gap: 10px; }
 .out-dot { width: 10px; height: 10px; border-radius: 50%; background: #c084fc; animation: pulse 1.5s infinite; }
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
@@ -203,21 +214,25 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #0f
     <div id="view-log" style="display:none;">
       <div class="filter-row" id="filter-row"></div>
       <div style="padding:0 16px 8px;" id="full-log-list"></div>
-      <button class="export-btn" onclick="exportCSV()">⬇️ Export CSV</button>
+      <div style="display:flex;gap:10px;padding:0 16px 8px;">
+        <button class="export-btn" style="margin:0;flex:2" onclick="exportCSV()">⬇️ Export CSV</button>
+        <button class="export-btn" style="margin:0;flex:1;color:#ff6b6b;border-color:rgba(255,107,107,0.3)" onclick="deleteAllConfirm()">🗑 Delete All</button>
+      </div>
+      <div style="padding:0 16px 32px;"></div>
     </div>
   </div>
 </div>
 
 <!-- ROSTER -->
 <div id="screen-roster" class="screen">
-  <div class="header">
+  <div class="header" id="roster-header">
     <div class="back-btn" onclick="goTo('screen-periods');renderGrid();">←</div>
     <div>
       <div class="header-title" id="roster-title"></div>
       <div class="header-sub" id="roster-sub"></div>
     </div>
   </div>
-  <div id="out-banner" style="display:none;" class="out-banner">
+  <div id="out-banner" style="display:none;" class="out-banner" onclick="openBathOverlay()">
     <div class="out-banner-left">
       <div class="out-dot"></div>
       <div>
@@ -225,7 +240,7 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #0f
         <div class="out-timer" id="out-banner-timer">0:00</div>
       </div>
     </div>
-    <button class="out-stop-btn" onclick="stopBathFromBanner()">✓ Back</button>
+    <button class="out-stop-btn" onclick="event.stopPropagation();stopBathFromBanner()">✓ Back</button>
   </div>
   <div class="stats-strip" id="period-stats"></div>
   <div class="roster-scroll">
@@ -296,13 +311,18 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #0f
 </div>
 
 <script>
-var ROSTER = {
-  2:["Ajay","Aleida","Alex","Ami","Anthony","Autumn C","Chris Y","Cora","Dashleen","Elle","Emiliano","Giselle","Jade V","Jaime","Jay S-F","Jayda","Jessica R M","Kemiyah","Kurt","Maaz","Maiyah","Marcos","Nayeli","Reycelly","Rita","Sa'Myiah","Sofia M","Susana","X'Zavier","Zion"],
+var ROSTER_RAW = {
+  2:["Ajay","Aleida","Alex R","Ami","Anthony","Autumn C","Chris Y","Cora","Dashleen","Elle","Emiliano","Giselle","Jade V","Jaime","Jay S-F","Jayda","Jessica R M","Kemiyah","Kurt","Maaz","Maiyah","Marcos","Nayeli","Reycelly","Rita","Sa'Myiah","Sofia M","Susana","X'Zavier","Zion"],
   3:["Aiden","Amari","Armando","Blythe","Catalina","Kota","Dharamjit","Ella","Emma D","Isa","Ismael","Jayden","Jude","Jynnaleiah","Kalia","Kenzie","Koraline","Kylie","Laurel","Lyra","Maximus","Meah","Michael-Anthony","Miguel","Mira","Nahomi","Nayana","Rosa","Sam","Samone","Sophia M","Vincent"],
   4:["Adam","Amayah","Arianna","Audriana","Caesar","Conner","Dalton","Darla","Davion","Eli","Enevaeh","Gabriel","Giancarlo","Isaac","Izzy","Jade S","Jay M","Jessica Q","JJ","Khris","Logan","Lucy","Luis","Maddie","Makena","Roman","Sameera","Sara","Solei","Sophia V","Uriah","Victoria"],
   5:["Aiden","Aiyanna","Alan P","Alan V","Alejandro","Azmodin","Bella","Ben","Bernice","Daniel","Deon","Einez","Emily","Emma C","Esteban","Estella","Estevan","Gen","Gerardo","Jackson","Jocelyn","Kate","Lamarr","Lily","Macivia","Mason","Reese","Richard","Scotty","Sophia T","Sukhman"],
-  6:["A'aleyha","Abigale","Alex","Angel","Ashlynn","Benji","Brooklyn","Chris M","Christian","Cleo","Collin","Ellington","Emery","Ethanael","Evelyn","Hamdy","Isaiah","Jordan","Joseph","Karyme","Leo","Lili","Monica","Mya","Natalie","Natalie V","Nikol","Noah","Prechea","Rigo","Tatyanna","Troy","Zara"]
+  6:["Abigale","Alex","Angel","Ashlynn","Benji","Brooklyn","Chris M","Christian","Cleo","Collin","Ellington","Emery","Ethanael","Evelyn","Hamdy","Isaiah","Jordan","Joseph","Karyme","Leo","Lili","Monica","Mya","Natalie","Natalie V","Nikol","Noah","Prechea","Rigo","Tatyanna","Troy","Zara"]
 };
+// Sort each period alphabetically (fix #7)
+var ROSTER = {};
+for(var _p in ROSTER_RAW){
+  ROSTER[_p] = ROSTER_RAW[_p].slice().sort(function(a,b){ return a.toLowerCase().localeCompare(b.toLowerCase()); });
+}
 
 var PERIODS = [
   {id:1,label:"1st Period Prep",time:"8:30 – 9:27am",start:"8:30",prep:true},
@@ -425,7 +445,20 @@ function goTo(id){
 
 // ── BATHROOM LOGIC ──
 function startBath(pid, name){
-  if(activeOut){ showToast('⚠️ '+activeOut.student+' is already out!'); return; }
+  if(activeOut && activeOut.student === name){ openBathOverlay(); return; }
+  if(activeOut){
+    // Another student is already out — show confirmation modal
+    showSecondBathConfirm(pid, name);
+    return;
+  }
+  startBathConfirmed(pid, name);
+}
+
+function startBathConfirmed(pid, name){
+  // If someone was already out, log them as returned before starting new timer
+  if(activeOut && activeOut.student !== name){
+    stopBathSilent();
+  }
   activeOut = {period:pid, student:name, startTime:Date.now()};
   save();
   startBannerTimer();
@@ -433,6 +466,45 @@ function startBath(pid, name){
   renderStudentList(document.getElementById('search-input').value);
   showToast('🚻 '+name+' left for bathroom');
   openBathOverlay();
+}
+
+function stopBathSilent(){
+  if(!activeOut) return;
+  var duration = Math.floor((Date.now() - activeOut.startTime)/1000);
+  var q = getCurrentQuarter();
+  var trips = bathTripsThisQuarter(activeOut.period, activeOut.student);
+  var tripNum = trips.length + 1;
+  bathLog.push({id:Date.now(), period:activeOut.period, student:activeOut.student,
+    startTime:activeOut.startTime, endTime:Date.now(), durationSecs:duration,
+    tripNum:tripNum, isOwed:tripNum>3, quarter:q});
+  activeOut = null;
+  stopBannerTimer();
+  hideBanner();
+  closeBathOverlay();
+  save();
+}
+
+function showSecondBathConfirm(pid, name){
+  var outName = activeOut.student;
+  // Reuse modal for confirmation
+  document.getElementById('modal-title').textContent = '🚻 ' + outName + ' is still out';
+  document.getElementById('modal-sub').textContent = 'Are you sure ' + name + ' can go too?';
+  document.getElementById('modal-body').innerHTML =
+    '<div class="consequence-box" style="background:rgba(192,132,252,0.1);border:1px solid rgba(192,132,252,0.3)">' +
+    '<div class="consequence-label" style="color:#c084fc">⚠️ Currently out</div>' +
+    '<div class="consequence-text">' + outName + ' has been out ' + fmtSecs((Date.now()-activeOut.startTime)/1000) + '</div>' +
+    '<div class="consequence-detail">Allowing ' + name + ' to go will end ' + outName + "'s timer and start a new one.</div></div>";
+  var confirmBtn = document.getElementById('modal-confirm');
+  confirmBtn.className = 'btn-confirm';
+  confirmBtn.style.background = '#c084fc';
+  confirmBtn.style.color = '#1a0030';
+  confirmBtn.textContent = 'Yes, allow ' + name;
+  confirmBtn.onclick = function(){
+    confirmBtn.onclick = confirmIncident; // restore
+    closeModal();
+    startBathConfirmed(pid, name);
+  };
+  document.getElementById('modal').classList.add('open');
 }
 
 function openBathOverlay(){
@@ -531,14 +603,14 @@ if(activeOut) startBannerTimer();
 function renderGrid(){
   var g=document.getElementById('period-grid'); g.innerHTML='';
   for(var i=0;i<PERIODS.length;i++){
-    var p=PERIODS[i],t=pTot(p.id);
+    var p=PERIODS[i];
     var students=ROSTER[p.id];
     var countStr=students?students.length+' students':'Prep period';
+    var colorClass=p.prep?'':' p'+p.id;
     var card=document.createElement('div');
-    card.className='period-card'+(p.prep?' prep':'');
+    card.className='period-card'+colorClass+(p.prep?' prep':'');
     card.innerHTML='<div><div class="period-name">'+p.label+'</div><div class="period-time">'+p.time+'</div></div>'+
       '<div class="period-right"><span class="period-count">'+countStr+'</span>'+
-      (t.total>0?'<span class="period-badge">'+t.total+'</span>':'')+
       '<span class="chevron">›</span></div>';
     if(!p.prep){ (function(pid){ card.onclick=function(){ openPeriod(pid); }; })(p.id); }
     g.appendChild(card);
@@ -567,9 +639,9 @@ function renderFilters(){
 
 function renderFullLog(){
   var el=document.getElementById('full-log-list');
+  el.innerHTML='';
   var icons={cell:'📱',tardy:'🕐',part:'💤',bath:'🚻'};
 
-  // combine log + bathLog into one sorted list
   var combined = [];
   for(var i=0;i<log.length;i++) combined.push({source:'log',data:log[i],ts:log[i].timestamp});
   for(var i=0;i<bathLog.length;i++) combined.push({source:'bath',data:bathLog[i],ts:bathLog[i].endTime});
@@ -578,39 +650,59 @@ function renderFullLog(){
   if(activeFilter!=='all'){
     var f=[];
     for(var i=0;i<combined.length;i++){
-      var type = combined[i].source==='bath'?'bath':combined[i].data.type;
-      if(type===activeFilter) f.push(combined[i]);
+      var type2 = combined[i].source==='bath'?'bath':combined[i].data.type;
+      if(type2===activeFilter) f.push(combined[i]);
     }
     combined=f;
   }
 
   if(!combined.length){ el.innerHTML='<div class="empty-log">No incidents logged yet</div>'; return; }
-  var html='';
+
   for(var i=0;i<combined.length;i++){
-    var item=combined[i];
-    var type,name,detail,ts;
-    if(item.source==='bath'){
-      var b=item.data;
-      type='bath'; name=b.student; ts=b.endTime;
-      detail='🚻 Trip #'+b.tripNum+' — '+fmtMins(b.durationSecs)+(b.isOwed?' ⚠️ time owed':'')+' — Period '+b.period;
-    } else {
-      var e=item.data;
-      type=e.type; name=e.student; ts=e.timestamp;
-      detail=type==='tardy'?e.minutes+' min late — Period '+e.period:'Period '+e.period;
-    }
-    html+='<div class="log-full-item"><div class="log-full-icon '+type+'">'+icons[type]+'</div>'+
-      '<div><div class="log-full-name">'+name+'</div><div class="log-full-detail">'+detail+'</div></div>'+
-      '<div class="log-full-time">'+fmtDate(ts)+'<br>'+fmtTime(ts)+'</div></div>';
+    (function(item){
+      var type,name,detail,ts,entryId,src=item.source,pid;
+      if(src==='bath'){
+        var b=item.data; type='bath'; name=b.student; ts=b.endTime; entryId=b.id; pid=b.period;
+        detail=fmtMins(b.durationSecs)+(b.isOwed?' ⚠️ time owed':'');
+      } else {
+        var e=item.data; type=e.type; name=e.student; ts=e.timestamp; entryId=e.id; pid=e.period;
+        detail=type==='tardy'?e.minutes+' min late':type==='cell'?'Cell phone':type==='part'?'Participation':'';
+      }
+      var pcolor=PERIOD_COLORS[pid]||'#6c7fff';
+      var pclass='p'+pid;
+      var row=document.createElement('div');
+      row.className='log-full-item';
+      row.style.cursor='pointer';
+      row.innerHTML=
+        '<div class="log-full-icon '+type+'">'+icons[type]+'</div>'+
+        '<div style="flex:1">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'+
+            '<span class="period-pill '+pclass+'">P'+pid+'</span>'+
+            '<span class="log-full-name">'+name+'</span>'+
+          '</div>'+
+          '<div class="log-full-detail">'+detail+'</div>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<div class="log-full-time">'+fmtDate(ts)+'<br>'+fmtTime(ts)+'</div>'+
+          '<div style="font-size:14px;color:#3a4060">✏️</div>'+
+        '</div>';
+      row.onclick=function(){ openEditSheet(entryId, src); };
+      el.appendChild(row);
+    })(combined[i]);
   }
-  el.innerHTML=html;
 }
 
 // ── ROSTER ──
+var PERIOD_COLORS = {2:'#e05252',3:'#e07c32',4:'#4caf7d',5:'#4f9fd4',6:'#a374d4'};
+
 function openPeriod(pid){
   cur.period=pid;
   var p=getPeriod(pid);
   document.getElementById('roster-title').textContent=p.label;
   document.getElementById('roster-sub').textContent=p.time;
+  // Color the header accent
+  var color=PERIOD_COLORS[pid]||'#6c7fff';
+  document.getElementById('roster-header').style.borderBottom='3px solid '+color;
   renderStats(pid);
   renderStudentList('');
   document.getElementById('search-input').value='';
@@ -695,7 +787,7 @@ function refreshStudent(){
   var bathSubText = '';
   if(trips.length===0) bathSubText='No trips this quarter';
   else if(trips.length<=3) bathSubText=trips.length+' of 3 free trips used';
-  else bathSubText=trips.length+' trips — '+fmtMins(owed)+' time owed';
+  else bathSubText=trips.length+' trips — '+fmtMins(owed)+' time owed ✕ <span style="color:#c084fc;text-decoration:underline" onclick="event.stopPropagation();openClearOwed('+pid+',\'' + name.replace(/'/g,"\\'")+'\')" >clear</span>';
 
   document.getElementById('action-grid').innerHTML=
     '<div class="action-card cell" onclick="openModal(\'cell\')">'+
@@ -713,17 +805,24 @@ function refreshStudent(){
       '<div><div class="action-label">Participation</div>'+
       '<div class="action-count">'+(p===0?'No reminders':'Reminded '+p+' time'+(p>1?'s':''))+'</div></div>'+
       '<div class="action-arrow">›</div></div>'+
-    '<div class="action-card bath'+(isOut?' active-out':'')+'"'+(isOut?' onclick="openBathOverlay()"':'')+'>'+
+    '<div class="action-card bath'+(isOut?' active-out':'')+'" id="bath-action-card">'+
       '<div class="action-icon">🚻</div>'+
       '<div style="flex:1"><div class="action-label">Bathroom</div>'+
       '<div class="action-count">'+bathSubText+'</div></div>'+
       (isOut?
         '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">'+
           '<div id="live-bath-timer" style="font-size:26px;font-weight:700;color:#c084fc;font-family:monospace;">'+fmtSecs((Date.now()-activeOut.startTime)/1000)+'</div>'+
-          '<button class="bath-btn stop" onclick="event.stopPropagation();stopBath()">✓ Back</button>'+
+          '<button class="bath-btn stop" id="bath-stop-btn">✓ Back</button>'+
         '</div>'
         :bathStatus)+
     '</div>';
+  // Wire bath card onclick after render (avoids inline string quoting issues with apostrophe names)
+  setTimeout(function(){
+    var bc=document.getElementById('bath-action-card');
+    if(bc){ bc.onclick=function(){ if(isOut){ openBathOverlay(); } else { startBath(pid,name); } }; }
+    var sb=document.getElementById('bath-stop-btn');
+    if(sb){ sb.onclick=function(e){ e.stopPropagation(); stopBath(); }; }
+  },0);
 
   // log
   var entries=[]; var allEntries=[];
