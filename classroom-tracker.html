@@ -1037,9 +1037,33 @@ function deleteEntry(){
     log=newLog;
   }
   var deletedId = editTarget ? editTarget.id : null;
-  save(); closeEditSheet(); refreshStudent(); renderGrid();
+  save(); closeEditSheet(); refreshStudent(); renderGrid(); renderFullLog();
   showToast('🗑 Entry deleted');
   if(deletedId) deleteFromSheets(deletedId);
+}
+
+// ── DELETE ALL ──
+function deleteAllConfirm(){
+  document.getElementById('modal-title').textContent = '🗑 Delete All Logs';
+  document.getElementById('modal-sub').textContent = 'This cannot be undone.';
+  document.getElementById('modal-body').innerHTML =
+    '<div class="consequence-box red"><div class="consequence-label red">⚠️ Warning</div>' +
+    '<div class="consequence-text">All incidents and bathroom trips will be permanently deleted.</div>' +
+    '<div class="consequence-detail">Use this to clear test data before real use.</div></div>';
+  var confirmBtn = document.getElementById('modal-confirm');
+  confirmBtn.className = 'btn-confirm';
+  confirmBtn.style.background = '#ff6b6b';
+  confirmBtn.style.color = 'white';
+  confirmBtn.textContent = 'Delete Everything';
+  confirmBtn.onclick = function(){
+    log=[]; bathLog=[]; save();
+    confirmBtn.onclick = confirmIncident;
+    confirmBtn.style.background = '';
+    confirmBtn.style.color = '';
+    closeModal(); renderGrid(); renderFullLog();
+    showToast('🗑 All logs deleted');
+  };
+  document.getElementById('modal').classList.add('open');
 }
 
 // ── MODAL ──
