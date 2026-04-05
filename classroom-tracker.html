@@ -471,7 +471,10 @@ function bathTripsThisQuarter(pid,name){
 function timeOwedSeconds(pid,name){
   var trips = bathTripsThisQuarter(pid,name);
   var owed=0;
-  for(var i=3;i<trips.length;i++) owed+=trips[i].durationSecs;
+  // Only count trips that are currently marked as owed and not cleared
+  for(var i=0;i<trips.length;i++){
+    if(trips[i].isOwed && !trips[i].owedCleared) owed+=trips[i].durationSecs;
+  }
   return owed;
 }
 
