@@ -208,6 +208,7 @@ body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #0f
   <div class="nav-tabs">
     <div class="nav-tab active" id="tab-btn-periods" onclick="switchTab('periods')">Periods</div>
     <div class="nav-tab" id="tab-btn-log" onclick="switchTab('log')">Full Log</div>
+    <div class="nav-tab" style="flex:0.6;font-size:12px" onclick="manualSync()">🔄 Sync</div>
   </div>
   <div class="scroll-content">
     <div id="view-periods"><div class="period-grid" id="period-grid"></div></div>
@@ -379,6 +380,78 @@ function save(){
   } catch(e){}
 }
 
+// ── SHEETS SYNC ──
+var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0g2uYYpKO3uTNVCMZJywWFtqh48x2Kt4eL4lJmCkOJ-CfXoFSiFF9AMJQdnzNUbay/exec'; // filled in after deploy
+
+function syncFromSheets(callback){
+  if(!SCRIPT_URL){ if(callback) callback(); return; }
+  fetch(SCRIPT_URL)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data.entries) { if(callback) callback(); return; }
+      // Rebuild log and bathLog from Sheets entries
+      log = [];
+      bathLog = [];
+      for(var i=0;i<data.entries.length;i++){
+        var e = data.entries[i];
+        if(e.type==='bath'){
+          // Parse bath detail: "Trip #N — Xm Ys (time owed)"
+          var tripMatch = e.detail.match(/Trip #(\d+)/);
+          var durMatch  = e.detail.match(/(\d+)m(?:\s+(\d+)s)?/);
+          var tripNum   = tripMatch ? parseInt(tripMatch[1]) : 1;
+          var durSecs   = durMatch  ? parseInt(durMatch[1])*60 + (durMatch[2]?parseInt(durMatch[2]):0) : 0;
+          var isOwed    = e.detail.indexOf('time owed') !== -1;
+          var qNum      = e.quarter ? parseInt(e.quarter.replace('Q','')) : 4;
+          bathLog.push({
+            id: e.rowId, period: e.period, student: e.student,
+            startTime: e.rowId, endTime: e.rowId,
+            durationSecs: durSecs, tripNum: tripNum,
+            isOwed: isOwed, quarter: qNum
+          });
+        } else {
+          var mins = null;
+          if(e.type==='tardy'){ var m=e.detail.match(/(\d+)/); mins=m?parseInt(m[1]):null; }
+          log.push({
+            id: e.rowId, period: e.period, student: e.student,
+            type: e.type, minutes: mins, timestamp: e.rowId
+          });
+        }
+      }
+      save();
+      if(callback) callback();
+    })
+    .catch(function(){ if(callback) callback(); });
+}
+
+function manualSync(){
+  if(!SCRIPT_URL){ showToast('No Sheets URL configured'); return; }
+  showToast('Syncing…');
+  syncFromSheets(function(){
+    renderGrid();
+    showToast('✅ Synced with Google Sheets');
+  });
+}
+
+function postToSheets(incident){
+  if(!SCRIPT_URL) return;
+  fetch(SCRIPT_URL, {
+    method:'POST',
+    mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(incident)
+  }).catch(function(){});
+}
+
+function deleteFromSheets(rowId){
+  if(!SCRIPT_URL) return;
+  fetch(SCRIPT_URL, {
+    method:'POST',
+    mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action:'delete', rowId:rowId})
+  }).catch(function(){});
+}
+
 // ── HELPERS ──
 function cnt(pid,name,type){ var n=0; for(var i=0;i<log.length;i++) if(log[i].period===pid&&log[i].student===name&&log[i].type===type) n++; return n; }
 
@@ -547,6 +620,7 @@ function stopBath(){
   });
 
   var name = activeOut.student;
+  var outPeriod = activeOut.period;
   activeOut = null;
   save();
   stopBannerTimer();
@@ -560,6 +634,8 @@ function stopBath(){
   refreshStudent();
   renderStudentList(document.getElementById('search-input').value);
   renderGrid();
+  postToSheets({period:outPeriod, student:name, type:'bath',
+    tripNum:tripNum, duration:fmtMins(duration), isOwed:isOwed, quarter:q});
 }
 
 function stopBathFromBanner(){
@@ -957,8 +1033,10 @@ function deleteEntry(){
     for(var i=0;i<log.length;i++) if(log[i].id!==editTarget.id) newLog.push(log[i]);
     log=newLog;
   }
+  var deletedId = editTarget ? editTarget.id : null;
   save(); closeEditSheet(); refreshStudent(); renderGrid();
   showToast('🗑 Entry deleted');
+  if(deletedId) deleteFromSheets(deletedId);
 }
 
 // ── MODAL ──
@@ -1006,10 +1084,12 @@ function closeModal(){ document.getElementById('modal').classList.remove('open')
 
 function confirmIncident(){
   if(cur.mtype==='tardy'&&!cur.tardyMin){ showToast('⚠️ Please select minutes late'); return; }
-  log.push({id:Date.now(),period:cur.period,student:cur.student,type:cur.mtype,minutes:cur.tardyMin||null,timestamp:Date.now()});
+  var entry = {id:Date.now(),period:cur.period,student:cur.student,type:cur.mtype,minutes:cur.tardyMin||null,timestamp:Date.now()};
+  log.push(entry);
   save(); closeModal(); refreshStudent(); renderGrid();
   var msgs={cell:'📱 Cell logged for '+cur.student,tardy:'🕐 '+cur.tardyMin+' min tardy — '+cur.student,part:'💤 Participation logged for '+cur.student};
   showToast(msgs[cur.mtype]);
+  postToSheets({period:entry.period, student:entry.student, type:entry.type, minutes:entry.minutes});
 }
 
 // ── EXPORT ──
@@ -1055,7 +1135,22 @@ var now=new Date();
 var days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
 document.getElementById('hero-date').textContent=days[now.getDay()]+', '+months[now.getMonth()]+' '+now.getDate();
+
+// Show roster immediately from local cache, then refresh from Sheets
 renderGrid();
+if(activeOut) startBannerTimer();
+
+if(SCRIPT_URL){
+  document.getElementById('period-grid').innerHTML += '';
+  var syncMsg = document.createElement('div');
+  syncMsg.style.cssText='text-align:center;font-size:13px;color:#7b82a8;padding:8px 0 0';
+  syncMsg.textContent='Syncing with Google Sheets…';
+  document.getElementById('period-grid').appendChild(syncMsg);
+  syncFromSheets(function(){
+    renderGrid();
+    syncMsg.remove();
+  });
+}
 </script>
 </body>
 </html>
