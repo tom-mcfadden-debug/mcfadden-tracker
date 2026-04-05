@@ -866,7 +866,7 @@ function refreshStudent(){
   var bathSubText = '';
   if(trips.length===0) bathSubText='No trips this quarter';
   else if(trips.length<=3) bathSubText=trips.length+' of 3 free trips used';
-  else bathSubText=trips.length+' trips — '+fmtMins(owed)+' time owed ✕ <span style="color:#c084fc;text-decoration:underline" onclick="event.stopPropagation();openClearOwed('+pid+',\'' + name.replace(/'/g,"\\'")+'\')" >clear</span>';
+  else bathSubText=trips.length+' trips — '+fmtMins(owed)+' time owed';
 
   document.getElementById('action-grid').innerHTML=
     '<div class="action-card cell" onclick="openModal(\'cell\')">'+
@@ -901,6 +901,16 @@ function refreshStudent(){
     if(bc){ bc.onclick=function(){ if(isOut){ openBathOverlay(); } else { startBath(pid,name); } }; }
     var sb=document.getElementById('bath-stop-btn');
     if(sb){ sb.onclick=function(e){ e.stopPropagation(); stopBath(); }; }
+    var ec=document.getElementById('clear-owed-btn');
+    if(ec) ec.remove();
+    if(owed>0){
+      var cb=document.createElement('button');
+      cb.id='clear-owed-btn';
+      cb.style.cssText='display:block;width:100%;padding:13px;border-radius:12px;background:rgba(192,132,252,0.1);border:1px solid rgba(192,132,252,0.3);color:#c084fc;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;margin-top:-4px;-webkit-appearance:none;';
+      cb.textContent='⏱ Clear time owed ('+fmtMins(owed)+')';
+      (function(p,n){ cb.onclick=function(){ openClearOwed(p,n); }; })(pid,name);
+      document.getElementById('action-grid').appendChild(cb);
+    }
   },0);
 
   // log
@@ -1040,6 +1050,63 @@ function deleteEntry(){
   save(); closeEditSheet(); refreshStudent(); renderGrid(); renderFullLog();
   showToast('🗑 Entry deleted');
   if(deletedId) deleteFromSheets(deletedId);
+}
+
+// ── CLEAR TIME OWED ──
+function openClearOwed(pid, name){
+  var trips = bathTripsThisQuarter(pid, name);
+  var owedTrips = trips.filter(function(t){ return t.isOwed; });
+  var totalOwedSecs = timeOwedSeconds(pid, name);
+  document.getElementById('modal-title').textContent = '⏱ Clear Time Owed';
+  document.getElementById('modal-sub').textContent = name + ' — ' + fmtMins(totalOwedSecs) + ' total owed';
+  var minsOwed = Math.ceil(totalOwedSecs/60);
+  var btns = '';
+  for(var m=1; m<=minsOwed; m++){
+    btns += '<button class="tardy-btn" onclick="selClearMins(this,'+m+')">'+m+'m</button>';
+  }
+  document.getElementById('modal-body').innerHTML =
+    '<div class="consequence-box" style="background:rgba(192,132,252,0.1);border:1px solid rgba(192,132,252,0.3);margin-bottom:14px">' +
+    '<div class="consequence-label" style="color:#c084fc">Owed from trips #' +
+    owedTrips.map(function(t){return t.tripNum;}).join(', #') + '</div>' +
+    '<div class="consequence-text">' + fmtMins(totalOwedSecs) + ' total</div></div>' +
+    '<div class="edit-tardy-label">Or clear a specific amount:</div>' +
+    '<div class="tardy-grid" id="clear-mins-grid">' + btns + '</div>';
+  var confirmBtn = document.getElementById('modal-confirm');
+  confirmBtn.className = 'btn-confirm';
+  confirmBtn.style.background = '#c084fc';
+  confirmBtn.style.color = '#1a0030';
+  confirmBtn.textContent = 'Clear All Owed Time';
+  confirmBtn.onclick = function(){
+    for(var i=0;i<bathLog.length;i++){
+      if(bathLog[i].period===pid&&bathLog[i].student===name&&bathLog[i].isOwed){
+        bathLog[i].isOwed=false; bathLog[i].owedCleared=true;
+      }
+    }
+    save(); confirmBtn.onclick=confirmIncident; confirmBtn.style.background=''; confirmBtn.style.color='';
+    closeModal(); refreshStudent(); renderGrid();
+    showToast('✅ All time owed cleared for '+name);
+  };
+  document.getElementById('modal').classList.add('open');
+}
+
+function selClearMins(el, m){
+  document.querySelectorAll('#clear-mins-grid .tardy-btn').forEach(function(b){ b.classList.remove('selected'); });
+  el.classList.add('selected');
+  var pid=cur.period, name=cur.student;
+  var confirmBtn=document.getElementById('modal-confirm');
+  confirmBtn.textContent='Clear '+m+'m';
+  confirmBtn.onclick=function(){
+    var remaining=m*60;
+    for(var i=0;i<bathLog.length;i++){
+      if(bathLog[i].period===pid&&bathLog[i].student===name&&bathLog[i].isOwed&&remaining>0){
+        if(bathLog[i].durationSecs<=remaining){ remaining-=bathLog[i].durationSecs; bathLog[i].isOwed=false; bathLog[i].owedCleared=true; }
+        else { bathLog[i].durationSecs-=remaining; remaining=0; }
+      }
+    }
+    save(); confirmBtn.onclick=confirmIncident; confirmBtn.style.background=''; confirmBtn.style.color='';
+    closeModal(); refreshStudent(); renderGrid();
+    showToast('✅ '+m+'m cleared for '+name);
+  };
 }
 
 // ── DELETE ALL ──
